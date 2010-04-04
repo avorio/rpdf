@@ -26,7 +26,7 @@ use constant DPI 		=> 300;
 use strict;
 use warnings;
 binmode STDOUT, ":utf8";
-use Sysexec;
+use util::Sysexec;
 
 # change to right directory for relative paths:
 use File::Basename qw/dirname/;

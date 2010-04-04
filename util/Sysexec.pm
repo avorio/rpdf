@@ -1,5 +1,5 @@
 #!/usr/bin/perl
-package Sysexec;
+package util::Sysexec;
 use strict;
 use warnings;
 use IO::Handle;
