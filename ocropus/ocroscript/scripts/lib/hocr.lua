@@ -165,7 +165,7 @@ function PageNode:hocr_output(document --[[unused, but might be used later]])
             if line == 1 or not headings[line - 1] then
                 print '<h3>'
             end
-            self[line]:hocr_output()
+            self[line]:hocr_output(self)
             if line == #self or not headings[line + 1] then
                 print '</h3>'
             end
