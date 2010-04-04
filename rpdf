@@ -4,9 +4,9 @@ sub usage() {
     print <<EOD;
 
 Extracts text and layout information from PDF documents, using
-pdftohtml or ocropus for OCR.
+pdftohtml or OCRopus.
 
-usage: perl $0 [-d int] [-p int] file.pdf
+usage: $0 [-d int] [-p int] file.pdf
 
  -d int : debug level
  -p int : max. number of pages to parse

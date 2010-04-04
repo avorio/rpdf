@@ -137,7 +137,7 @@ int main(int argc, char *argv[]) {
 
   if (errQuiet) {
     globalParams->setErrQuiet(errQuiet);
-    printCommands = gFalse; // I'm not 100% what is the differecne between them
+    printCommands = gFalse; // I'm not 100% what is the difference between them
   }
 
   if (textEncName[0]) {
@@ -174,8 +174,8 @@ int main(int argc, char *argv[]) {
 
   // check for copy permission
   if (!doc->okToCopy()) {
-    error(-1, "Copying of text from this document is not allowed.");
-    goto error;
+    // error(-1, "Copying of text from this document is not allowed.");
+    // goto error;
   }
 
   // construct text file name
