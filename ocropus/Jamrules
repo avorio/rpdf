@@ -1,0 +1,8 @@
+if $(TOP) = "." {
+    Exit "Please run\
+    ./configure" ;
+} else {
+    Exit "Please run\
+    cd $(TOP)\
+    ./configure" ;
+}
