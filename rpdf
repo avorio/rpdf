@@ -19,8 +19,9 @@ EOD
 }
 
 use constant GS         	=> '/usr/bin/gs';
+use constant PDFTOHTML          => 'pdftohtml/src/pdftohtml'
 use constant OCROSCRIPT 	=> 'ocropus/ocroscript/ocroscript';
-use constant TEMPDIR 	        => '/tmp/';
+use constant TEMPDIR 	        => '../temp/';
 use constant DPI 		=> 300;
 
 use strict;
@@ -43,11 +44,34 @@ sub init() {
 }
 
 sub pdf2xml {
-    # convert pdf to pngs:
     my $source = shift;
-    if (!(-e $source)) {
-	die "$source does not exist";
+    die "$source does not exist" unless (-e $source);
+    my $command = PDFTOHTML
+        .' -i'        	# ignore images
+        .' -xml'      	# xml output
+        .' -enc \'UTF-8\''
+        .' -stdout'   	# output to stdout
+        .' '.$filename 	# source file
+        .' 2>&1';     	# stderr to stdout
+    my $xml = sysexec($command, 10, verbosity) || '';
+    # strip anchors (inserted by pdftohtml for footnotes):
+    $xml =~ s/<a[^>]+>(.+?)<\/a>/$1/gi;
+    if ($xml && $xml =~ /<text.+?>.*\w{5}.*</) {
+        # sometimes $text isn't really UTF8 and decode_utf8() returns undef
+        $xml = Encode::decode_utf8($xml) || $xml;
+        return $xml;
     }
+    # if pdftohtml failed, we use OCR:
+    print "pdftohtml failed on parsing. Using OCR.\n" if verbosity;
+    $xml = ocr($filename) || '';
+    if (!$xml || $xml !~ /<text.+?>.*\w{5}.*</) {
+        die "OCR failed. $xml $!";
+    }
+    return $xml;
+}
+
+sub ocr {
+    # convert pdf to pngs:
     my $tempfile = $source;
     $tempfile =~ s/\W/o/g;
     $tempfile = TEMPDIR.$tempfile;
@@ -96,6 +120,7 @@ sub pdf2xml {
     # convert ocroscript output to pdftohtml-style XML output
     # (output is not valid XML atm):
     my $scale = 100/DPI;
+    $xml = "<converter>ocr</converter>\n".$xml; # hack!
     # strip <p> tags, they are useless:
     $xml =~ s/<\/?p.*?>//g;
     # replace <div> by <page>:
