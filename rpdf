@@ -19,7 +19,7 @@ EOD
 }
 
 use constant GS         	=> '/usr/bin/gs';
-use constant PDFTOHTML          => 'pdftohtml/src/pdftohtml'
+use constant PDFTOHTML          => 'pdftohtml/pdftohtml'
 use constant OCROSCRIPT 	=> 'ocropus/ocroscript/ocroscript';
 use constant TEMPDIR 	        => '../temp/';
 use constant DPI 		=> 300;

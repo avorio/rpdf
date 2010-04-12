@@ -43,5 +43,6 @@ ocropus/ocroscript/sysutil.cc
 ocropus/ocroscript/tess.cc
 ocropus/ocroscript/version.cc
 ocropus/svn_info
+ocropus/Jamrules
 pdftohtml-0.36.tar.gz
 pdftohtml/pdftohtml
