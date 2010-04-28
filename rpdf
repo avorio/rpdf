@@ -26,11 +26,11 @@ use lib $Bin;
 use util::Sysexec;
 binmode STDOUT, ":utf8";
 
-use constant GS         	=> '/usr/bin/gs';
-use constant PDFTOHTML          => $Bin.'/pdftohtml/pdftohtml';
-use constant OCROSCRIPT 	=> $Bin.'/ocropus/ocroscript/ocroscript';
-use constant TEMPDIR 	        => $Bin.'/temp/';
-use constant DPI 		=> 300;
+use constant GS           => '/usr/bin/gs';
+use constant OCROPUS      => '/usr/local/bin/ocropus';
+use constant PDFTOHTML    => $Bin.'/pdftohtml/pdftohtml';
+use constant TEMPDIR 	  => $Bin.'/temp/';
+use constant DPI          => 400;
 
 
 my %opt = ( "d" => 0 );
@@ -104,12 +104,14 @@ sub ocr {
         push @pngs, $tempfile."003.png" if ($pages > 30);
         # push @pngs, $tempfile.sprintf("%03d.png", $pages) if ($pages > 1);
     }
-    $command = OCROSCRIPT
-              .' rec-tess'
-              .' '.join(' ', @pngs)
-              .' 2>&1';     # stderr to stdout
-    print "$command\n" if $opt{'d'} >= 3;
-    my $xml = sysexec($command, 60, $opt{'d'}) || '';
+    $command = OCROPUS.' book2pages work '.join(' ', @pngs)
+        .' && '.OCROPUS.' pages2lines work'
+        .' && '.OCROPUS.' lines2fsts work'
+        .' && '.OCROPUS.' fsts2text work'
+        .' 2>&1';
+    sysexec($command, 60, $opt{'d'});
+    $command = OCROPUS.' buildhtml work; rm -r work';
+    my $xml = sysexec($command, 10, $opt{'d'}) || '';
     print "$xml\n" if $opt{'d'} >= 3;
     die "OCR failed: $xml" unless ($xml =~ /DOCTYPE/);
 
@@ -118,13 +120,17 @@ sub ocr {
     $xml =~ s/(?<=[a-z])1(?=[a-z])/i/g;    # 1 => i
     $xml =~ s/. .u \&\#174\;//g;           # This the JSTOR logo
 
+    $xml = hocr2xml($xml);
+}
+
+sub hocr2xml {
     # convert ocroscript output to pdftohtml-style XML output
     # (output is not valid XML atm):
+    my $xml = shift;
     my $scale = 100/DPI;
     $xml = "<converter>ocr</converter>\n".$xml; # hack!
     # strip <p> tags, they are useless:
     $xml =~ s/<\/?p.*?>//g;
-    # replace <div> by <page>:
     # ocroscript doesn't preserve font info; we only get <h3> for headings.
     my $fontspecs = '<fontspec id="0" size="12" family="Times" color="#000000"/>'."\n"
       .'<fontspec id="1" size="18" family="Times" color="#000000"/>'."\n";
