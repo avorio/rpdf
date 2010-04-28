@@ -1,0 +1,25 @@
+INC=/usr/local/include
+PYINC=/usr/include/python2.5
+LUAINC=/usr/include/lua5.1
+LIBS=-locropus -liulib -ltiff -lpng -ljpeg -lSDL -lSDL_gfx -lSDL_image \
+    -ltesseract_full -llept -lgsl -lm -lblas \
+    -llua5.1
+
+ocrolua: iulib_wrap.o ocropus_wrap.o luamain.o
+	g++ -g -o ocrolua -fopenmp $^ $(LIBS)
+
+luamain.o: luamain.cc
+	g++ -g -c -I$(INC) -I$(LUAINC) luamain.cc
+
+iulib_wrap.o: iulib.i
+	swig -I$(INC) -lua -c++ iulib.i 
+	g++ -g -c -I$(INC) -I$(LUAINC) iulib_wrap.cxx
+
+ocropus_wrap.o: ocropus.i
+	swig -I$(INC) -lua -c++ ocropus.i
+	g++ -g -c -I$(INC) -I$(LUAINC) -fopenmp -shared ocropus_wrap.cxx
+
+
+clean:
+	rm -f *.so *.cxx *.o
+

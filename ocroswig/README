@@ -1,0 +1,5 @@
+TODO:
+
+-- bind a lot more stuff
+-- write numpy_copy_narray and narray_copy_numpy
+-- write numpy_take_narray and narray_take_numpy

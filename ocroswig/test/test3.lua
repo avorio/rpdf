@@ -1,0 +1,5 @@
+print("loading")
+linerec = ocropus.load_linerec("latin3-full.model")
+print("loaded")
+print(linerec:name())
+print(linerec:pgetf("csize"))

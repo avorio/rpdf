@@ -1,0 +1,54 @@
+#!/usr/bin/python
+
+# imgr
+
+import signal
+signal.signal(signal.SIGINT,lambda *args:sys.exit(1))
+from pylab import *
+import sys,os,re,ocropy,optparse
+from ocropy import N,NI
+from scipy.ndimage import measurements
+from scipy.misc import imsave
+from PIL import Image
+import ocropy.tiseg
+
+parser = optparse.OptionParser(usage="""
+%prog [options] page1.png page2.png ...
+
+Computes text/image segmentation of grayscale input images.
+""")
+parser.add_option("-d","--display",help="display result",action="store_true")
+parser.add_option("-D","--Display",help="display continuously",action="store_true")
+parser.add_option("-r","--dpi",help="resolution in DPI",type=float,default=200.0)
+parser.add_option("-c","--close",help="closing",type=int,default=0)
+parser.add_option("-o","--open",help="opening",type=int,default=2)
+options,args = parser.parse_args()
+
+if options.Display: options.display = 1
+if options.display: ion(); show()
+
+tisegmenter = ocropy.make_ITextImageClassification("SimpleTIClassification")
+
+count = 1
+
+for arg in args:
+    print
+    print "===",arg,"==="
+    print
+
+    image = ocropy.bytearray()
+    ocropy.read_image_gray(image,arg)
+
+    result = ocropy.intarray()
+    tisegmenter.textImageProbabilities(result,image,options.open,options.close)
+
+    if options.display: 
+        clf(); imshow(NI(result),cmap=cm.gray); draw()
+        if not options.Display: 
+            raw_input("hit ENTER to continue")
+        else:
+            ginput(1,timeout=1)
+
+    base,_ = ocropy.allsplitext(arg)
+    ocropy.write_image_packed(base+".tiseg.png",result)
+    count += 1
