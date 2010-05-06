@@ -120,7 +120,7 @@ int main(int argc, char *argv[]) {
   // parse args
   ok = parseArgs(argDesc, &argc, argv);
   if (!ok || argc < 2 || argc > 3 || printHelp || printVersion) {
-    fprintf(stderr, "pdftohtml version %s http://pdftohtml.sourceforge.net/, based on Xpdf version %s\n", "0.36", xpdfVersion);
+    fprintf(stderr, "pdftohtml version %s http://pdftohtml.sourceforge.net/, based on Xpdf version %s\n", "0.39", xpdfVersion);
     fprintf(stderr, "%s\n", "Copyright 1999-2003 Gueorgui Ovtcharov and Rainer Dorsch");
     fprintf(stderr, "%s\n\n", xpdfCopyright);
     if (!printVersion) {
@@ -137,7 +137,7 @@ int main(int argc, char *argv[]) {
 
   if (errQuiet) {
     globalParams->setErrQuiet(errQuiet);
-    printCommands = gFalse; // I'm not 100% what is the difference between them
+    printCommands = gFalse; // I'm not 100% what is the differecne between them
   }
 
   if (textEncName[0]) {
@@ -174,8 +174,8 @@ int main(int argc, char *argv[]) {
 
   // check for copy permission
   if (!doc->okToCopy()) {
-    // error(-1, "Copying of text from this document is not allowed.");
-    // goto error;
+    error(-1, "Copying of text from this document is not allowed.");
+    goto error;
   }
 
   // construct text file name
@@ -287,7 +287,7 @@ int main(int argc, char *argv[]) {
 
   if (htmlOut->isOk())
   {
-	doc->displayPages(htmlOut, firstPage, lastPage, static_cast<int>(72*scale), 0, gTrue);
+	doc->displayPages(htmlOut, firstPage, lastPage, static_cast<int>(72*scale), static_cast<int>(72*scale), 0, gTrue, gTrue);
   	if (!xml)
 	{
 		htmlOut->dumpDocOutline(doc->getCatalog());
@@ -308,8 +308,7 @@ int main(int argc, char *argv[]) {
     globalParams->setPSNoText(gTrue);
     psOut = new PSOutputDev(psFileName->getCString(), doc->getXRef(),
 			    doc->getCatalog(), firstPage, lastPage, psModePS);
-    doc->displayPages(psOut, firstPage, lastPage, 
-	    static_cast<int>(72*scale), 0, gFalse);
+    doc->displayPages(psOut, firstPage, lastPage, static_cast<int>(72*scale), static_cast<int>(72*scale), 0, gTrue, gTrue);
     delete psOut;
 
     /*sprintf(buf, "%s -sDEVICE=png16m -dBATCH -dNOPROMPT -dNOPAUSE -r72 -sOutputFile=%s%%03d.png -g%dx%d -q %s", GHOSTSCRIPT, htmlFileName->getCString(), w, h,
