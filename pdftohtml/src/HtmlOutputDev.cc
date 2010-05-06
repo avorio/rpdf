@@ -865,7 +865,7 @@ HtmlOutputDev::HtmlOutputDev(char *fileName, char *title,
   pages = new HtmlPage(rawOrder, extension);
   
   glMetaVars = new GList();
-  glMetaVars->append(new HtmlMetaVar("generator", "pdftohtml 0.36"));  
+  glMetaVars->append(new HtmlMetaVar("generator", "pdftohtml 0.39"));  
   if( author ) glMetaVars->append(new HtmlMetaVar("author", author));  
   if( keywords ) glMetaVars->append(new HtmlMetaVar("keywords", keywords));  
   if( date ) glMetaVars->append(new HtmlMetaVar("date", date));  
@@ -937,10 +937,8 @@ HtmlOutputDev::HtmlOutputDev(char *fileName, char *title,
     if (xml) 
     {
       fprintf(page, "<?xml version=\"1.0\" encoding=\"%s\"?>\n", htmlEncoding);
-      fputs("<document>\n", page);
-      fputs("<meta>\n", page);
-      fputs("<converter>pdftohtml</converter>\n", page);
-      fputs("</meta>\n", page);
+      fputs("<!DOCTYPE pdf2xml SYSTEM \"pdf2xml.dtd\">\n\n", page);
+      fputs("<pdf2xml>\n",page);
     } 
     else 
     {
@@ -978,7 +976,7 @@ HtmlOutputDev::~HtmlOutputDev() {
       fclose(fContentsFrame);
     }
     if (xml) {
-      fputs("</document>\n",page);  
+      fputs("</pdf2xml>\n",page);  
       fclose(page);
     } else
     if ( !complexMode || xml || noframes )
