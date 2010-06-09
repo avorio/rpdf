@@ -1,5 +1,0 @@
-image = iulib.bytearray()
-iulib.read_image_gray(image,"test.jpg")
-iulib.dinit(512,512,1)
-iulib.dshow(image)
-iulib.dwait()

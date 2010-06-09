@@ -1,9 +1,0 @@
-#!/bin/sh
-
-svn status | 
-egrep '(^M|^A|^D|^C|^\?.*\.(h|c|cc|png|lua)$)' | 
-egrep -v '(/| |	)data|tests/images' |
-fgrep -f '.nosvn' -v
-
-find . |
-fgrep .mine
