@@ -1,0 +1,306 @@
+#!/usr/bin/perl
+
+#
+# A simple converter from hOCR files as produced by cuneiform to XML
+# "document" files. Ignores most of the hOCR specification. 
+#
+# (c) wo@umsu.de
+#
+
+sub usage() {
+    print <<EOD;
+
+Converts a hOCR file to an XML document file.
+
+usage: $0 in.hocr out.xml
+
+EOD
+   exit;
+}
+
+use strict;
+use warnings;
+use IO::File;
+use XML::Writer;
+use XML::XPath;
+use HTML::TreeBuilder;
+
+use Data::Dumper;
+
+use constant DPI => 300;
+
+my $infile = shift @ARGV or usage();
+my $outfile = shift @ARGV or usage();
+
+# init XML file:
+my $output = new IO::File(">$outfile");
+my $xml = new XML::Writer(
+    OUTPUT => $output,
+    NEWLINES => 1,
+    ENCODING => 'utf-8',
+    UNSAFE => 1);
+$xml->xmlDecl();
+$xml->startTag("document");
+$xml->startTag("converter");
+$xml->characters("OCR");
+$xml->endTag("converter");
+$xml->startTag("content");
+
+# parse hOCR file:
+my $hocr = HTML::TreeBuilder->new_from_file($infile)->as_XML();
+my $xc = XML::XPath->new(xml => $hocr);
+my @pages = $xc->findnodes('//div[@class="ocr_page"]');
+my $scale = 100/DPI;
+my $default_fontsize = 12;
+my $page_count = 0;
+foreach my $page (@pages) {
+    add_page($page);
+}
+$xml->endTag("content");
+$xml->endTag("document");
+$xml->end();
+$output->close();
+
+sub add_page {
+    # This code is not as simple as it should because XML::Writer
+    # requires elements to be added in order, so I have to iterate
+    # twice over all text lines to get the fontspec elements in front
+    # of the text elements.
+    my $page = shift;
+    ++$page_count;
+    my ($width, $height) = ("0", "0");
+    if ($page->getAttribute('title') =~ /bbox (\d+) (\d+) (\d+) (\d+)/) {
+        ($width, $height) = ($3, $4);
+    }
+    $xml->startTag("page",
+                   "number" => $page_count,
+                   "width" => $width,
+                   "height" => $height);
+    # Cuneiform hOCR doesn't give information about font family, so I
+    # pretend everything is "Times", and I try to guess the font size
+    # from the character bboxes.
+    my %fonts;
+    my @texts;
+    # The next two lines should really go: 
+    # my @lines = $xc->findnodes('//span[@class="ocr_line"]', $page);
+    # But this collects all lines on all pages. I don't know why.
+    my $xp = XML::XPath->new(xml => $page->toString());
+    my @lines = $xp->findnodes('//span[@class="ocr_line"]');
+    foreach my $line (@lines) {
+        if ($line->getAttribute('title') !~ /bbox (\d+) (\d+) (\d+) (\d+)/) {
+            # ignore lines without coordinates (shouldn't happen)
+            warn "file contains line element without bbox coordinates";
+            next;
+        }
+        my ($left, $top, $right, $bottom) = ($1, $2, $3, $4);
+        my $fontsize = guess_fontsize($line);
+        # print "fontsize $fontsize: ".$line->string_value."\n";
+        unless (exists $fonts{$fontsize}) {
+            # hash values will be fontspec ids, counting from 0:
+            $fonts{$fontsize} = scalar keys(%fonts);
+        }
+        # Text content may contain <b> and <i> tags:
+        my $line_text = $line->toString();
+        # Remove node tag:
+        $line_text =~ s/^<span[^>]*>(.+)<\/span>$/$1/;
+        # Remove ocr_cinfo spans:
+        $line_text =~ s/<span[^>]*>(.*?)(<\/span>)?/$1/;
+        push @texts, {
+            left => int($left*$scale),
+            top => int($top*$scale),
+            width => int(($right-$left)*$scale),
+            height => int(($bottom-$top)*$scale),
+            font => $fonts{$fontsize},
+            text => $line_text
+        };
+    }
+    while (my($size, $id) = each(%fonts)) {
+        $xml->emptyTag("fontspec",
+                       "id" => $id,
+                       "size" => $size,
+                       "family" => "Times",
+                       "color" => "#000");
+    }
+    foreach my $text (@texts) {
+        $xml->startTag("text",
+                       "left" => $text->{left},
+                       "top" => $text->{top},
+                       "width" => $text->{width},
+                       "height" => $text->{height},
+                       "font" => $text->{font});
+        $xml->raw($text->{text});
+        $xml->endTag("text");
+    }
+    $xml->endTag("page");
+}
+
+sub guess_fontsize {
+    # cuneiform hOCR lines contain tags like <span class='ocr_cinfo'
+    # title="x_bboxes 418 639 446 669 447 640 465 670">, where those
+    # numbers are the left/top/right/bottom coordinates of each
+    # individual character on the line. I try to guess the font size
+    # from these coordinates.
+    # 
+    # TODO: Can font size change mid-line? If so, should I check every
+    # character? Or do a rough test for mid-line changes?
+    my $line = shift;
+    my $xp = XML::XPath->new(xml => $line->toString());
+    my @spans = $xp->findnodes('//span[@class="ocr_cinfo"]')
+        or return $default_fontsize;
+    my $span = $spans[0];
+    my $text = $line->string_value()
+        or return $default_fontsize;
+    # What follows is a very simple hack just to have something going:
+    # find some upper-case letter and measure its height. The font
+    # size of a capital letter with height x is x*scale.
+    unless ($text =~ m/[ABCDEFGHJKLMNOPSTUVXYZ]/ || $text =~ m/[hblf96]/) {
+        return $default_fontsize;
+    }
+    my $pos = length($`);
+    my @charsizes = $span->getAttribute('title') =~ m/[-\d]+ [-\d]+ [-\d]+ [-\d]+/g;
+    return $default_fontsize unless (defined $charsizes[$pos]);
+    my ($l, $t, $r, $b) = ($charsizes[$pos] =~ m/[-\d]+/g);
+    my $charheight = int($b)-int($t);
+    return int($charheight*$scale);
+}
+
+=pod
+
+sub hocr2xml {
+    # ocroscript doesn't preserve font info; we only get <h3> for headings.
+    my $fontspecs = '<fontspec id="0" size="12" family="Times" color="#000000"/>'."\n"
+      .'<fontspec id="1" size="18" family="Times" color="#000000"/>'."\n";
+    my $page_re = qr/<div.+page.+bbox (\d+) (\d+) (\d+) (\d+).+?>/;
+    for (my $p=1; $xml =~ /$page_re/; $p++) {
+    my $newtag = '<page number="'.$p.'" position="absolute" top="0" left="0" height="'.int($4*$scale).'" width="'.int($3*$scale).'">';
+    $xml =~ s/$page_re/$newtag\n$fontspecs/;
+    }
+    $xml =~ s|</div|</page|g;
+    # replace <span> by <text>:
+    $xml =~ s/<span.+bbox (\d+) (\d+) (\d+) (\d+).+?>/'<text top="'.int($2*$scale).'" left="'.int($1*$scale).'" width="'.int(($3-$1)*$scale).'" height="'.int(($4-$2)*$scale).'" font="0">'/ge;
+    $xml =~ s|</span|</text|g;
+    # adjust font size for <h3>:
+    my @xml = split /<\/?h3.*?>/, $xml;
+    my $in_h3 = 0;
+    for my $i (0 .. $#xml) {
+    $xml[$i] =~ s/font="0">/font="1">/g if ($in_h3);
+    $in_h3 = !$in_h3;
+    }
+    $xml = join "\n", @xml;
+    return $xml;
+}
+
+sub pdf2xml {
+    my $source = shift;
+    die "$source does not exist" unless (-e $source);
+    my $command = PDFTOHTML
+        .' -i'            # ignore images
+        .' -xml'          # xml output
+        .' -enc \'UTF-8\''
+        .' -stdout'       # output to stdout
+        .' '.$source      # source file
+        .' 2>&1';         # stderr to stdout
+    my $xml = sysexec($command, 10, $opt{'d'}) || '';
+    # strip anchors (inserted by pdftohtml for footnotes):
+    $xml =~ s/<a[^>]+>(.+?)<\/a>/$1/gi;
+    if ($xml && $xml =~ /<text.+?>.*\w{5}.*</) {
+        # sometimes $text isn't really UTF8 and decode_utf8() returns undef
+        $xml = Encode::decode_utf8($xml) || $xml;
+        return $xml;
+    }
+    # if pdftohtml failed, we use OCR:
+    print "pdftohtml failed on parsing. Using OCR.\n" if $opt{'d'};
+    $xml = ocr($source) || '';
+    if (!$xml || $xml !~ /<text.+?>.*\w{5}.*</) {
+        die "OCR failed. $xml $!";
+    }
+    return $xml;
+}
+
+sub ocr {
+    my $source = shift;
+    # convert pdf to pngs:
+    my $tempfile = $source;
+    $tempfile =~ s/\W/o/g;
+    $tempfile = TEMPDIR.$tempfile;
+    my $command = GS
+              ." -sOutputFile=$tempfile%03d.png"
+              .' -sDEVICE=pnggray'
+              .' -dTextAlphaBits=4'
+          .' -r'.DPI
+              .' -dNOPAUSE -dSAFER -dBATCH -q'
+          ." $source"
+          .' 2>&1';     # stderr to stdout
+    print "$command\n" if $opt{'d'} >= 3;
+    my $out = sysexec($command, 20, $opt{'d'}) || '';
+    print "$out\n" if $opt{'d'} >= 3;
+    my $pages = 0;
+    $pages++ while (-e $tempfile.sprintf("%03d.png", $pages+1));
+    die "gs failed. $out" if $pages == 0;
+
+    # OCR pngs:
+    my @pngs;
+    if ($opt{'p'}) {
+        for (my $i=1; $i<=$pages && $i<=$opt{'p'}; $i++) {
+            push @pngs, $tempfile.sprintf("%03d.png", $i);
+        }
+    }
+    else {
+        push @pngs, $tempfile."001.png";
+        push @pngs, $tempfile."002.png" if ($pages > 5);
+        push @pngs, $tempfile."003.png" if ($pages > 30);
+        # push @pngs, $tempfile.sprintf("%03d.png", $pages) if ($pages > 1);
+    }
+    $command = OCROPUS.' book2pages work '.join(' ', @pngs)
+        .' && '.OCROPUS.' pages2lines work'
+        .' && '.OCROPUS.' lines2fsts work'
+        .' && '.OCROPUS.' fsts2text work'
+        .' 2>&1';
+    sysexec($command, 60, $opt{'d'});
+    $command = OCROPUS.' buildhtml work; rm -r work';
+    my $xml = sysexec($command, 10, $opt{'d'}) || '';
+    print "$xml\n" if $opt{'d'} >= 3;
+    die "OCR failed: $xml" unless ($xml =~ /DOCTYPE/);
+
+    # fix some common OCR mistakes:
+    $xml =~ s/(?<=[a-z])0(?=[a-z])/o/g;    # 0 => o
+    $xml =~ s/(?<=[a-z])1(?=[a-z])/i/g;    # 1 => i
+    $xml =~ s/. .u \&\#174\;//g;           # This the JSTOR logo
+
+    $xml = hocr2xml($xml);
+}
+
+sub hocr2xml {
+    # convert ocroscript output to pdftohtml-style XML output
+    # (output is not valid XML atm):
+    my $xml = shift;
+    my $scale = 100/DPI;
+    $xml = "<converter>ocr</converter>\n".$xml; # hack!
+    # strip <p> tags, they are useless:
+    $xml =~ s/<\/?p.*?>//g;
+    # ocroscript doesn't preserve font info; we only get <h3> for headings.
+    my $fontspecs = '<fontspec id="0" size="12" family="Times" color="#000000"/>'."\n"
+      .'<fontspec id="1" size="18" family="Times" color="#000000"/>'."\n";
+    my $page_re = qr/<div.+page.+bbox (\d+) (\d+) (\d+) (\d+).+?>/;
+    for (my $p=1; $xml =~ /$page_re/; $p++) {
+    my $newtag = '<page number="'.$p.'" position="absolute" top="0" left="0" height="'.int($4*$scale).'" width="'.int($3*$scale).'">';
+    $xml =~ s/$page_re/$newtag\n$fontspecs/;
+    }
+    $xml =~ s|</div|</page|g;
+    # replace <span> by <text>:
+    $xml =~ s/<span.+bbox (\d+) (\d+) (\d+) (\d+).+?>/'<text top="'.int($2*$scale).'" left="'.int($1*$scale).'" width="'.int(($3-$1)*$scale).'" height="'.int(($4-$2)*$scale).'" font="0">'/ge;
+    $xml =~ s|</span|</text|g;
+    # adjust font size for <h3>:
+    my @xml = split /<\/?h3.*?>/, $xml;
+    my $in_h3 = 0;
+    for my $i (0 .. $#xml) {
+    $xml[$i] =~ s/font="0">/font="1">/g if ($in_h3);
+    $in_h3 = !$in_h3;
+    }
+    $xml = join "\n", @xml;
+    return $xml;
+}
+
+=cut
+
+1;
