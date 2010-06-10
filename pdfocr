@@ -23,7 +23,7 @@ Options:
 # default params:
 INFILE=''
 OUTFILE='out.hocr'
-DIR='temp'
+DIR='/tmp'
 KEEP=0
 LANG='eng'
 
@@ -68,12 +68,12 @@ echo "processing $INFILE.."
 if test ! -e "$DIR"; then
     mkdir "$DIR"
 fi
-cp "$INFILE" "$DIR/"
+cp "$INFILE" "$DIR/orig.pdf"
 cd "$DIR"
 
 # split pdf into single pages:
 echo "splitting PDF.."
-pdftk "$INFILE" burst dont_ask
+pdftk orig.pdf burst dont_ask
 
 # process pages:
 count=1
@@ -85,11 +85,11 @@ do
     convert -quiet -monochrome -normalize -density 300 "$page" "$page.bmp"
     echo "calling cuneiform.."
     cuneiform -l $LANG -f hocr -o "$page.html" "$page.bmp"
-    echo "adding output content to $OUTFILE.."
+    echo "adding output to result.."
     if test $count = 1; then
-        sed -e "s/<\/body><\/html>//" < "$page.html" > $OUTFILE
+        sed -e "s/<\/body><\/html>//" < "$page.html" > result.hocr
     else
-        sed -e "s/<.DOC.*\|<html.*\|<meta.*\|<\/head.*\|<body>\|<\/body><\/html>//" < "$page.html" >> $OUTFILE
+        sed -e "s/<.DOC.*\|<html.*\|<meta.*\|<\/head.*\|<body>\|<\/body><\/html>//" < "$page.html" >> result.hocr
     fi
     if test "$KEEP" = 0; then
         rm -f "$page"
@@ -98,14 +98,14 @@ do
     fi
     count+=1
 done
-echo "</body></html>" >> $OUTFILE
+echo "</body></html>" >> result.hocr
 
 # leave temp directory:
 cd -
-mv "$DIR/$OUTFILE" "$OUTFILE"
-if test "$KEEP" = 0; then
-    rm -f "$DIR"/*
-    rmdir "$DIR"
-fi
+mv "$DIR/result.hocr" "$OUTFILE"
+#if test "$KEEP" = 0; then
+#    rm -f "$DIR"/*
+#    rmdir "$DIR"
+#fi
 
 echo "done"

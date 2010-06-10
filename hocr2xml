@@ -33,7 +33,8 @@ my $infile = shift @ARGV or usage();
 my $outfile = shift @ARGV or usage();
 
 # init XML file:
-my $output = new IO::File(">$outfile");
+my $output = new IO::File(">$outfile")
+    or die "cannot create $outfile";
 my $xml = new XML::Writer(
     OUTPUT => $output,
     NEWLINES => 1,
