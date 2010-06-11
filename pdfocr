@@ -69,6 +69,19 @@ echo "processing $INFILE.."
 cp "$INFILE" "$DIR/orig.pdf"
 cd "$DIR"
 
+# when finished or interrupted:
+cleanup() {
+    cd - > /dev/null
+    if test -e "$DIR/result.hocr"; then
+        echo "</body></html>" >> "$DIR/result.hocr"
+        mv "$DIR/result.hocr" "$OUTFILE"
+    fi
+    if test "$KEEP" = 0; then
+        rm -f "$DIR"/*
+    fi
+}
+trap cleanup SIGINT
+
 # split pdf into single pages:
 echo "splitting PDF.."
 pdftk orig.pdf burst dont_ask
@@ -96,13 +109,6 @@ do
     fi
     count+=1
 done
-echo "</body></html>" >> result.hocr
 
-# leave temp directory:
-cd - > /dev/null
-mv "$DIR/result.hocr" "$OUTFILE"
-if test "$KEEP" = 0; then
-    rm -f "$DIR"/*
-fi
-
+cleanup
 echo "done"
