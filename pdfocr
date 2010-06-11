@@ -1,0 +1,111 @@
+#!/bin/bash
+#
+# OCR a PDF file
+#
+# Dependencies: 
+# convert (ImageMagick), pdftk, cuneiform
+#
+# 2010-05-31 Wolfgang Schwarz <wo@umsu.de>
+#
+
+set -e
+
+usage="
+Usage: $0 [options] in.pdf out.hocr
+
+Options:
+-w [DIR]     set working directory for temporary files
+-k           keep files in working directory
+-l [LANG]    language flag for cuneiform, default 'eng'
+
+"
+
+# default params:
+INFILE=''
+OUTFILE='out.hocr'
+DIR='/tmp'
+KEEP=0
+LANG='eng'
+
+# read params:
+while test -n "${1}"; do
+    case "${1}" in
+        *.pdf|*.PDF) INFILE="${1}"
+            shift;;
+        *.hocr|*.HOCR) OUTFILE="${1}"
+            shift;;
+        -w) DIR="${2}"
+            shift
+  	    shift;;
+        -k) KEEP=1
+  	    shift;;
+        -l) LANG="${2}"
+            shift
+  	    shift;;
+        -h) echo "$usage"
+            exit 0;;
+        *) echo "unrecognised argument ${1}"
+            exit 1;;
+    esac
+done
+
+if test "$INFILE" = ""; then
+    echo "$usage"
+    exit 1
+fi
+
+if test ! -e $INFILE; then
+    echo "Error: input file $INFILE does not exist."
+    exit 1
+fi
+
+# todo: guess orientation and rotate accordingly
+# todo: tidy with unpaper
+
+echo "processing $INFILE.."
+
+# move to temp directory:
+if test ! -e "$DIR"; then
+    mkdir "$DIR"
+fi
+cp "$INFILE" "$DIR/orig.pdf"
+cd "$DIR"
+
+# split pdf into single pages:
+echo "splitting PDF.."
+pdftk orig.pdf burst dont_ask
+
+# process pages:
+count=1
+declare -i count
+for page in pg_*.pdf 
+do
+    echo "page $count"
+    echo "converting to bitmap.."
+    convert -quiet -monochrome -normalize -density 300 "$page" "$page.bmp"
+    echo "calling cuneiform.."
+    cuneiform -l $LANG -f hocr -o "$page.html" "$page.bmp"
+    echo "adding output to result.."
+    if test $count = 1; then
+        sed -e "s/<\/body><\/html>//" < "$page.html" > result.hocr
+    else
+        sed -e "s/<.DOC.*\|<html.*\|<meta.*\|<\/head.*\|<body>\|<\/body><\/html>//" < "$page.html" >> result.hocr
+    fi
+    if test "$KEEP" = 0; then
+        rm -f "$page"
+        rm -f "$page.bmp"
+        rm -f "$page.html"
+    fi
+    count+=1
+done
+echo "</body></html>" >> result.hocr
+
+# leave temp directory:
+cd -
+mv "$DIR/result.hocr" "$OUTFILE"
+#if test "$KEEP" = 0; then
+#    rm -f "$DIR"/*
+#    rmdir "$DIR"
+#fi
+
+echo "done"
