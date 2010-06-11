@@ -1,1 +1,0 @@
-/usr/bin/c++  -fPIC -g -Wl,-Bsymbolic -shared -Wl,-soname,librdib.so.0.9.0 -o librdib.so.0.9.0 CMakeFiles/rdib.dir/sources/cpp/CTDIB.cpp.o 

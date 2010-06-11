@@ -1,1 +1,0 @@
-/usr/bin/gcc  -fPIC -g -Wl,-Bsymbolic -shared -Wl,-soname,librsadd.so.0.9.0 -o librsadd.so.0.9.0 CMakeFiles/rsadd.dir/src/rsadd.c.o ../cstr/libcstr.so.0.9.0 ../ccom/libccom.so.0.9.0 -Wl,-rpath,/home/wo/programming/opp-tools/rpdf/cuneiform-linux-0.9.0/builddir/cuneiform_src/Kern/cstr:/home/wo/programming/opp-tools/rpdf/cuneiform-linux-0.9.0/builddir/cuneiform_src/Kern/ccom 
