@@ -14,7 +14,7 @@ usage="
 Usage: $0 [options] in.pdf out.hocr
 
 Options:
--w [DIR]     set working directory for temporary files
+-w [DIR]     working directory for temporary files (will be wiped)
 -k           keep files in working directory
 -l [LANG]    language flag for cuneiform, default 'eng'
 
@@ -23,7 +23,7 @@ Options:
 # default params:
 INFILE=''
 OUTFILE='out.hocr'
-DIR='/tmp'
+DIR='/tmp/pdfocr'
 KEEP=0
 LANG='eng'
 
@@ -55,19 +55,17 @@ if test "$INFILE" = ""; then
 fi
 
 if test ! -e $INFILE; then
-    echo "Error: input file $INFILE does not exist."
+    echo "Input file $INFILE does not exist."
     exit 1
 fi
+
+mkdir -p "$DIR" || { echo "Cannot create $DIR"; exit 1; }
+rm -f "$DIR"/*
 
 # todo: guess orientation and rotate accordingly
 # todo: tidy with unpaper
 
 echo "processing $INFILE.."
-
-# move to temp directory:
-if test ! -e "$DIR"; then
-    mkdir "$DIR"
-fi
 cp "$INFILE" "$DIR/orig.pdf"
 cd "$DIR"
 
@@ -101,11 +99,10 @@ done
 echo "</body></html>" >> result.hocr
 
 # leave temp directory:
-cd -
+cd - > /dev/null
 mv "$DIR/result.hocr" "$OUTFILE"
-#if test "$KEEP" = 0; then
-#    rm -f "$DIR"/*
-#    rmdir "$DIR"
-#fi
+if test "$KEEP" = 0; then
+    rm -f "$DIR"/*
+fi
 
 echo "done"
