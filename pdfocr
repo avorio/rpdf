@@ -62,8 +62,11 @@ fi
 mkdir -p "$DIR" || { echo "Cannot create $DIR"; exit 1; }
 rm -f "$DIR"/*
 
-# todo: guess orientation and rotate accordingly
-# todo: tidy with unpaper
+# $OUTFILE with full path:
+OUTFILE="$( readlink -f "$( dirname "$OUTFILE" )" )/$( basename "$OUTFILE" )"
+
+# todo: guess orientation and rotate accordingly?
+# todo: tidy with unpaper?
 
 echo "processing $INFILE.."
 cp "$INFILE" "$DIR/orig.pdf"
@@ -71,16 +74,16 @@ cd "$DIR"
 
 # when finished or interrupted:
 cleanup() {
+    echo "cleaning up"
     cd - > /dev/null
-    if test -e "$DIR/result.hocr"; then
-        echo "</body></html>" >> "$DIR/result.hocr"
-        mv "$DIR/result.hocr" "$OUTFILE"
+    if test -e "$OUTFILE"; then
+        echo "</body></html>" >> "$OUTFILE"
     fi
     if test "$KEEP" = 0; then
         rm -f "$DIR"/*
     fi
 }
-trap cleanup SIGINT
+trap cleanup 2 9 15
 
 # split pdf into single pages:
 echo "splitting PDF.."
@@ -98,9 +101,9 @@ do
     cuneiform -l $LANG -f hocr -o "$page.html" "$page.bmp"
     echo "adding output to result.."
     if test $count = 1; then
-        sed -e "s/<\/body><\/html>//" < "$page.html" > result.hocr
+        sed -e "s/<\/body><\/html>//" < "$page.html" > "$OUTFILE"
     else
-        sed -e "s/<.DOC.*\|<html.*\|<meta.*\|<\/head.*\|<body>\|<\/body><\/html>//" < "$page.html" >> result.hocr
+        sed -e "s/<.DOC.*\|<html.*\|<meta.*\|<\/head.*\|<body>\|<\/body><\/html>//" < "$page.html" >> "$OUTFILE"
     fi
     if test "$KEEP" = 0; then
         rm -f "$page"
