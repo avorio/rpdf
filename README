@@ -16,7 +16,10 @@ rpdf requires
 - pdftk
 - the Perl modules XML::Writer, XML::XPath, HTML::TreeBuilder
 
-No further installation is required.
+No further installation required. To test if it works, run
+
+./rpdf test/simple.pdf
+./rpdf test/ocr.pdf
 
 
 ---------------------------------------------------------------------
